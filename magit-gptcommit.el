@@ -266,14 +266,6 @@ Value is (CREATION-TIME . MESSAGE) where CREATION-TIME is used to find the newes
   "Return cache value for KEY or DEFAULT if not found."
   (gethash key magit-gptcommit--cache default))
 
-(defun magit-gptcommit--cache-p (key)
-  "Non-nil when a value exists for KEY.
-
-Return a (KEY . VALUE) cons cell for compatibility with the old implementation."
-  (let ((value (gethash key magit-gptcommit--cache 'not-found)))
-    (unless (eq value 'not-found)
-      (cons key value))))
-
 (defun magit-gptcommit--find-newest-message ()
   "Find the most recent message from all workers.
 Returns the message text or nil if no messages are available.
