@@ -1,6 +1,6 @@
 ;;; magit-gptcommit.el --- Git commit with help of gpt -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Tiou Lims
+;; Copyright (C) 2024 Tiou Lims, 2025 Damian Barabonkov
 
 ;; Author: Tiou Lims <dourokinga@gmail.com>
 ;; URL: https://github.com/douo/magit-gptcommit
@@ -16,8 +16,6 @@
 ;;; Code:
 
 ;;;; Requirements
-
-;; Hello22
 
 (require 'cl-lib)
 (require 'dash)
@@ -266,6 +264,10 @@ Value is (CREATION-TIME . MESSAGE) where CREATION-TIME is used to find the newes
   "Return cache value for KEY or DEFAULT if not found."
   (gethash key magit-gptcommit--cache default))
 
+(defun magit-gptcommit--staged-diff ()
+  "Retrieve staged diff."
+  (magit-git-output "diff" "--staged" "-w"))
+
 (defun magit-gptcommit--find-newest-message ()
   "Find the most recent message from all workers.
 Returns the message text or nil if no messages are available.
@@ -311,6 +313,7 @@ Also removes expired messages from the hash table."
      ("G" "Generate" magit-gptcommit-generate)
      ("Q" "Quick Accept" magit-gptcommit-commit-quick)
      ("C" "Accept" magit-gptcommit-commit-create)
+     ("K" "Clear" magit-gptcommit-clear)
      ]))
 
 ;; credited: https://emacs.stackexchange.com/a/3339/30746
@@ -395,7 +398,7 @@ NO-CACHE is non-nil if cache should be ignored."
                  (magit-insert-section--parent magit-root-section))
 
         (magit-repository-local-delete 'magit-gptcommit--last-message)
-        (let* ((diff (magit-git-output "diff" "--staged"))
+        (let* ((diff (magit-gptcommit--staged-diff))
                (key (magit-gptcommit--cache-key diff))
                (worker (magit-repository-local-get 'magit-gptcommit--active-worker))
                (oldkey (and worker (magit-gptcommit--worker-key worker))))
@@ -577,6 +580,21 @@ Executed in the context of the commit message buffer."
   (if-let ((message (magit-repository-local-get 'magit-gptcommit--last-message)))
       (magit-run-git "commit" "-m" message)
     (user-error "No last gptcommit message found")))
+
+(defun magit-gptcommit-clear ()
+  "Clear the current gptcommit message."
+  (interactive)
+  (magit-gptcommit--debug "Clearing gptcommit message")
+  (when (magit-gptcommit--running-p)
+    (magit-gptcommit-abort))
+  ;; Remove the cache entry for current staged diff
+  (let* ((diff (magit-gptcommit--staged-diff))
+         (key (magit-gptcommit--cache-key diff)))
+    (remhash key magit-gptcommit--cache))
+  (magit-repository-local-delete 'magit-gptcommit--last-message)
+  (magit-gptcommit--clear-message-history)
+  (magit-gptcommit-remove-section)
+  (message "GPT commit message cleared"))
 
 ;;;; response handling
 
