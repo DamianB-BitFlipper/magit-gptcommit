@@ -17,6 +17,8 @@
 
 ;;;; Requirements
 
+;; Hello22
+
 (require 'cl-lib)
 (require 'dash)
 (require 'eieio)
@@ -62,7 +64,7 @@ If BUFFER is nil, use the current buffer."
          (region-size (- end-pos start-pos))
          ;; Ensure we never delete more than 80% of the buffer
          (max-safe-deletion (min max-commit-size
-                                (/ (* buf-size 80) 100))))
+                                 (/ (* buf-size 80) 100))))
 
     ;; Basic sanity checks for marker positions
     (and (bufferp buf)
@@ -85,7 +87,7 @@ Returns t if deletion was performed, nil otherwise."
         t)
     ;; Deletion not performed due to safety concerns
     (magit-gptcommit--debug "⚠️ PREVENTED UNSAFE DELETION: start=%s end=%s size=%s, buffer-size=%s"
-                           start end (- end start) (buffer-size))
+                            start end (- end start) (buffer-size))
     nil))
 
 ;;;###autoload
@@ -220,7 +222,7 @@ is nil."
   "Number of seconds before messages expire from the message history.
 Set to nil to disable message expiration."
   :type '(choice (integer :tag "Seconds before expiration")
-                 (const :tag "Never expire" nil))
+          (const :tag "Never expire" nil))
   :group 'magit-gptcommit)
 
 (defcustom magit-gptcommit-request-cooldown 0.01
@@ -291,7 +293,7 @@ Also removes expired messages from the hash table."
                     (> (- current-time time) magit-gptcommit-message-timeout))
            (push key expired-keys)
            (magit-gptcommit--debug "Message with key %s expired (age: %.1f seconds)"
-                                  key (- current-time time)))
+                                   key (- current-time time)))
 
          ;; Track the newest message
          (when (> time newest-time)
@@ -372,32 +374,6 @@ SECTION is determined by CONDITION, which is defined in `magit-section-match'."
       target)))
 
 
-(defun magit-gptcommit--retrieve-staged-diff ()
-  "Retrieve staged diff assuming current magit section is the staged section."
-  (let* ((section (magit-current-section))
-         (max-token (if (and magit-gptcommit-determine-max-token (not magit-gptcommit-max-token))
-                        (llm-chat-token-limit (magit-gptcommit--llm-provider))
-                      magit-gptcommit-max-token))
-         ;; HACK:  1 token ~= 4 chars
-         (max-char (- (* 4 max-token) (length magit-gptcommit-prompt)))
-         (diffs (mapcar
-                 (lambda (child)
-                   (with-slots (start end) child
-                     (cons start
-                           (- (marker-position end) (marker-position start)))))
-                 (oref section children)))
-         (total (with-slots (content end) section
-                  (- (marker-position end) (marker-position content)))))
-    (if (> total max-char)
-        (mapconcat
-         (lambda (child)
-           (buffer-substring-no-properties (car child)
-                                           (+ (marker-position (car child))
-                                              (floor (* max-char (/ (float (cdr child)) total))))))
-         diffs "\n")
-      (with-slots (content end) section
-        (buffer-substring-no-properties content end)))))
-
 (cl-defun magit-gptcommit--running-p (&optional (repository (magit-repository-local-repository)))
   "Return non-nil if gptcommit is running for current REPOSITORY."
   (magit-repository-local-exists-p 'magit-gptcommit--active-worker repository))
@@ -427,7 +403,7 @@ NO-CACHE is non-nil if cache should be ignored."
                  (magit-insert-section--parent magit-root-section))
 
         (magit-repository-local-delete 'magit-gptcommit--last-message)
-        (let* ((diff (magit-gptcommit--retrieve-staged-diff))
+        (let* ((diff (magit-git-output "diff" "--staged"))
                (key (magit-gptcommit--cache-key diff))
                (worker (magit-repository-local-get 'magit-gptcommit--active-worker))
                (oldkey (and worker (magit-gptcommit--worker-key worker))))
@@ -464,8 +440,8 @@ NO-CACHE is non-nil if cache should be ignored."
                           (assq-delete-all buf (magit-gptcommit--worker-sections worker)))
                     ;; Use the helper function for consistent formatting
                     (magit-gptcommit--insert-message (point)
-                                               (magit-gptcommit--worker-message
-                                                (magit-repository-local-get 'magit-gptcommit--active-worker))))
+                                                     (magit-gptcommit--worker-message
+                                                      (magit-repository-local-get 'magit-gptcommit--active-worker))))
                 (when worker
                   (magit-gptcommit-abort))
                 (let ((start-position (point-marker))
@@ -698,7 +674,7 @@ ERROR-MSG is error message."
     ;; Check if worker is still active before proceeding
     (if (not (magit-gptcommit--worker-active worker))
         (magit-gptcommit--debug "⚠️ Ignoring status update for inactive worker with key: %s"
-                              (magit-gptcommit--worker-key worker))
+                                (magit-gptcommit--worker-key worker))
 
       ;; Worker is active, proceed with update
       (magit-gptcommit--debug "Found worker with key: %s" (magit-gptcommit--worker-key worker))
@@ -739,7 +715,7 @@ ERROR-MSG is error message."
                                                 (magit-gptcommit--worker-key worker))))
                                  (when (and last-message key)
                                    (magit-gptcommit--debug "Using%s message for completion"
-                                                          (if newest-message " newest" ""))
+                                                           (if newest-message " newest" ""))
                                    (magit-repository-local-set 'magit-gptcommit--last-message last-message)
                                    (magit-gptcommit--cache-set key last-message)))
                                ;; update section properties
@@ -787,13 +763,13 @@ Calls CALLBACK with the prompt response and INFO to update the response."
               (progn
                 (funcall callback response info)
                 (when (and (plist-get info :position)
-                          (plist-get info :tracking-marker))
+                           (plist-get info :tracking-marker))
                   (let ((start-position (marker-position (plist-get info :position)))
                         (tracking-marker (marker-position (plist-get info :tracking-marker))))
                     (when (and start-position tracking-marker
-                              ;; Safety check for marker positions
-                              (> start-position 1)
-                              (> tracking-marker start-position))
+                               ;; Safety check for marker positions
+                               (> start-position 1)
+                               (> tracking-marker start-position))
                       (pulse-momentary-highlight-region start-position tracking-marker))))
                 (magit-gptcommit--stream-update-status 'success))
             ;; Worker is inactive or gone, ignore response
@@ -837,7 +813,7 @@ from any worker is displayed in the section."
   (magit-gptcommit--debug "Attempting to update section with latest message")
   (condition-case err
       (when-let* ((newest-msg (magit-gptcommit--find-newest-message))
-                 (section (magit-gptcommit--goto-target-section 'gptcommit)))
+                  (section (magit-gptcommit--goto-target-section 'gptcommit)))
         (with-slots (start content end) section
           (when (and (markerp content) (markerp end)
                      (> (marker-position content) 1)
